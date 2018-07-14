@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2026
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CheckPrices", "CheckPrices\CheckPrices.csproj", "{44B6BA27-B0C1-4375-B20A-07EA287F2E38}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{44B6BA27-B0C1-4375-B20A-07EA287F2E38}.Debug|x86.ActiveCfg = Debug|x86
+		{44B6BA27-B0C1-4375-B20A-07EA287F2E38}.Debug|x86.Build.0 = Debug|x86
+		{44B6BA27-B0C1-4375-B20A-07EA287F2E38}.Release|x86.ActiveCfg = Release|x86
+		{44B6BA27-B0C1-4375-B20A-07EA287F2E38}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {64EC2C6D-C931-4F4C-87E5-84A02D83DA5A}
+	EndGlobalSection
+EndGlobal
