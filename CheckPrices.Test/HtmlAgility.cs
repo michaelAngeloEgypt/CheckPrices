@@ -6,13 +6,12 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using System.Collections.Specialized;
 using System.Net.Http;
+using System.Collections.Specialized;
 using System.Text.RegularExpressions;
 
 public static class HtmlAgility
 {
-
     public static string ReadHtmlBetween(string originalContent, string start, string end)
     {
         string section = originalContent.Between(start, end);
@@ -93,7 +92,6 @@ public static class HtmlAgility
         }
         catch (Exception e)
         {
-            e.Data.Add("theUrl", theUrl);
             XLogger.Error(e);
             return false;
         }
@@ -109,6 +107,7 @@ public static class HtmlAgility
             //content = GetWebContentCore3(url);
             //content = GetWebContentCore4(url);
             content = GetWebContentCore5(url);
+
             consumedRetries--;
         }
         return content;
@@ -158,6 +157,7 @@ public static class HtmlAgility
                 wp.Address = new Uri("http://10.230.233.30:5110/proxy.pac");
                 req.Proxy = wp;
             }
+
             // get the response and read from the result stream
             HttpWebResponse resp = req.GetResponse() as HttpWebResponse;
 
@@ -214,6 +214,7 @@ public static class HtmlAgility
                 wp.Address = new Uri("http://10.230.233.30:5110/proxy.pac");
                 wc.Proxy = wp;
             }
+
             return wc.DownloadString(url);
         }
         catch (Exception x)
@@ -252,6 +253,7 @@ public static class HtmlAgility
             req.Method = "GET";
             req.KeepAlive = false;
             req.ContentType = "text/html";
+
             if (useProxy)
             {
                 // Create proxy authentication object
@@ -265,6 +267,7 @@ public static class HtmlAgility
                 wp.Address = new Uri("http://10.230.233.30:5110/proxy.pac");
                 req.Proxy = wp;
             }
+
 
             using (HttpWebResponse response = (HttpWebResponse)req.GetResponse())
             {
@@ -284,6 +287,7 @@ public static class HtmlAgility
             return string.Empty;
         }
     }
+
     private static string GetWebContentCore5(string url)
     {
         string res = "";
@@ -301,7 +305,6 @@ public static class HtmlAgility
         }
         catch (Exception x)
         {
-            x.Data.Add("url", url);
             XLogger.Error(x);
             throw;
         }
@@ -421,11 +424,22 @@ public static class HtmlAgility
     /// <returns></returns>
     public static string Cleanup(this string source)
     {
+        List<String> MEOLeftDelimiters = new List<string>() { ".clienteMEO", ".clienteMEO:hover", ".MEOSignatureListItem{" };
+
         string result = source;
-        result = result.Replace("<![if !supportLists]>", "").Replace("<![endif]>", "");
-        result = result.Replace("\r\n", " ").Replace("\t", " ");
-        while (result.Contains("  "))
-            result = result.Replace("  ", " ");
+
+        foreach (var leftDelim in MEOLeftDelimiters)
+        {
+            string rubbish = source.ExtractStringBetweenDelimiters(leftDelim, "}");
+            if (!String.IsNullOrEmpty(rubbish))
+                result = result.Replace(rubbish, "");
+        }
+
+        result = result.ReplaceConsecutiveCopiesToOneInstance("\n");
+        result = result.ReplaceConsecutiveCopiesToOneInstance("\t");
+
+        result = result.Replace("\r\n", " ").Replace("\t", " ").Replace("\n", " ").Replace("&nbsp;", " ");
+        result = result.ReplaceConsecutiveCopiesToOneInstance(" ");
 
         StringWriter myWriter = new StringWriter();
         System.Net.WebUtility.HtmlDecode(result, myWriter);
@@ -499,15 +513,6 @@ public static class HtmlAgility
         return results;
     }
     //
-    public static string GetUrlFromAnchor(HtmlDocument doc, string elementXml, bool doCleanup = true)
-    {
-        HtmlNode theNode = null;
-        ScrapElementAndGetNode(doc, elementXml, out theNode, doCleanup);
-        if (theNode == null || theNode.Attributes["href"] == null || string.IsNullOrWhiteSpace(theNode.Attributes["href"].Value))
-            return string.Empty;
-
-        return theNode.Attributes["href"].Value;
-    }
     public static string ScrapElement(HtmlDocument doc, string elementXml, bool doCleanup = true)
     {
         HtmlNode theNode = null;
@@ -541,7 +546,6 @@ public static class HtmlAgility
         }
         return output;
     }
-
     /// <summary>
     /// <see cref="https://stackoverflow.com/questions/924679/c-sharp-how-can-i-check-if-a-url-exists-is-valid"/>
     /// </summary>
@@ -593,11 +597,11 @@ static class Ext
         return victim;
     }
     #endregion Extensions
-
 }
 class MyClient : WebClient
 {
     public bool HeadOnly { get; set; }
+
     /// <summary>
     /// <see cref="https://stackoverflow.com/questions/16829074/how-to-read-html-source-from-a-https-url"/>
     /// </summary>

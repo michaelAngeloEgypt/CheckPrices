@@ -10,6 +10,7 @@ using System.Threading;
 using System.Diagnostics;
 using System.Net.Mail;
 using System.Text;
+using System.Threading.Tasks;
 
 //Here is the once-per-application setup information
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
@@ -45,99 +46,24 @@ namespace CheckPrices
             }
         }
 
-
         [STAThread]
         static void Main()
         {
             log.Info("Start");
+            Stopwatch timer = Stopwatch.StartNew();
+            XLogger.Application = String.Format("CheckPrices||{0}||{1}", ConfigurationManager.AppSettings["ExeVersion"], DateTime.Now.ToString("yyyyMMddHHmmss"));
+            XLogger.Info("BEGIN:\t Scheduled Task Execution");
 
             try
             {
-                System.Net.ServicePointManager.DefaultConnectionLimit = NThreads;
-                var settings = SettingsConfigurationSection.Settings("Settings");
-                sites = settings.Sites;
-                var articles = settings.Articles;
-                string HGMLiftParts_Code = "";
+                var prices = ReadPrices();
+                SendReport(prices);
 
-                foreach (var article in articles.OrderBy(x => x.HGMLiftParts_Code).ThenBy(x => x.Site))
-                {
-                    Articles.Add(article);
-                    if (article.HGMLiftParts_Code != HGMLiftParts_Code)
-                        PricesToCalculate.Push(new Tuple<string, string, Articles>("HGMLiftParts", HGMLiftParts_Code = article.HGMLiftParts_Code, article));
-                    PricesToCalculate.Push(new Tuple<string, string, Articles>(article.Site, article.Code, article));
-                }
-
-                while (PricesToCalculate.Count > 0)
-                {
-                    stopWaitHandle = new AutoResetEvent(false);
-                    for (int i = 0; (i < NThreads) && (PricesToCalculate.Count > 0); i++)
-                        if (threads[i] == null)
-                        {
-                            threads[i] = new Thread(HandleThread);
-                            var PriceToCalculate = PricesToCalculate.Pop();
-                            threads[i].Name = string.Format("site: {0}, code: {1}", PriceToCalculate.Item1, PriceToCalculate.Item2);
-                            threads[i].Start(new args(i, PriceToCalculate.Item1, PriceToCalculate.Item2, PriceToCalculate.Item3));
-                        }
-                    stopWaitHandle.WaitOne();
-                }
-
-                for (int i = 0; i < NThreads; i++)
-                    if (threads[i] != null)
-                        threads[i].Join();
-
-                HGMLiftParts_Code = "";
-                double? HGMLiftParts_Price = null;
-                foreach (var article in Articles)
-                {
-                    if (article.HGMLiftParts_Code == HGMLiftParts_Code)
-                    {
-                        article.HGMLiftParts_Price = HGMLiftParts_Price;
-                    }
-                    else
-                    {
-                        HGMLiftParts_Price = article.HGMLiftParts_Price;
-                        HGMLiftParts_Code = article.HGMLiftParts_Code;
-                    }
-                }
-
-                StringBuilder sb = new StringBuilder("<table border='1'><tr><th>HGMLiftParts Code</th><th>HGMLiftParts Price</th><th>Site</th><th>Code</th><th>Price</th><th>Difference</th><th>Difference (%)</th></tr>");
-                foreach (var article in Articles)
-                {
-                    sb.AppendFormat("<tr><td>{0}</td><td align='right'>{1:N2}</td><td>{2}</td><td>{3}</td><td align='right'>{4}{5:N2}{6}</td><td align='right'>{7:+0.00;-0.00;0.00}</td><td align='right'>{8:+0.00;-0.00;0.00}</td></tr>", article.HGMLiftParts_Code, article.HGMLiftParts_Price == -1 ? null : article.HGMLiftParts_Price, article.Site, article.Code, article.Price != -1 && article.Price < article.HGMLiftParts_Price ? "<font color=red>" : "", article.Price == -1 ? null : article.Price, article.Price != -1 && article.Price < article.HGMLiftParts_Price ? "</font>" : "", article.Price == -1 || article.HGMLiftParts_Price == -1 ? null : article.Price - article.HGMLiftParts_Price, article.Price == -1 || article.HGMLiftParts_Price == -1 || article.HGMLiftParts_Price == 0 ? null : (article.Price - article.HGMLiftParts_Price) / article.HGMLiftParts_Price * 100.0);
-                }
-                sb.Append("</table>");
-                //File.AppendAllText("output.html", sb.ToString());
-
-                log.DebugFormat("Sending mail with contents: {0}", sb.ToString());
-
-                int Port;
-                int.TryParse(SettingsConfigurationSection.AppSetting("SendMailPort"), out Port);
-                using (SmtpClient client = new SmtpClient(SettingsConfigurationSection.AppSetting("SendMailHost"), Port))
-                {
-                    client.EnableSsl = SettingsConfigurationSection.AppSetting("SendMailEnableSsl").Equals("true", StringComparison.OrdinalIgnoreCase);
-                    MailAddress from = new MailAddress(SettingsConfigurationSection.AppSetting("SendMailFrom"), SettingsConfigurationSection.AppSetting("SendMailFrom"));
-                    string SendMailTo = SettingsConfigurationSection.AppSetting("SendMailTo");
-#if false
-                    MailAddress to = new MailAddress(SendMailTo, SendMailTo);
-                    using (MailMessage message = new MailMessage(from, to))
-                    {
-#else
-                    using (MailMessage message = new MailMessage())
-                    {
-                        message.From = from;
-                        foreach (var to in (SendMailTo ?? "").Replace(";", ",").Split(',').Select(x => x.Trim()).Where(x => (x.Length > 0) && (x.Contains('@'))))
-                            message.To.Add(to);
-
-#endif
-                        message.IsBodyHtml = true;
-                        message.Subject = SettingsConfigurationSection.AppSetting("SendMailSubject");
-                        message.Body = sb.ToString();
-                        message.ReplyToList.Add(SettingsConfigurationSection.AppSetting("SendMailFrom"));
-                        NetworkCredential myCreds = new NetworkCredential(SettingsConfigurationSection.AppSetting("SendMailUser"), SettingsConfigurationSection.AppSetting("SendMailPwd"), SettingsConfigurationSection.AppSetting("SendMailDomain"));
-                        client.Credentials = myCreds;
-                        client.Send(message);
-                    }
-                }
+                /*
+                //OLD
+                ComputePrices_OLD();
+                SendReport_OLD();
+                */
             }
             catch (Exception ex)
             {
@@ -145,9 +71,185 @@ namespace CheckPrices
             }
 
             log.Info("End");
+            TimeSpan ts = timer.Elapsed;
+            var elapsed = String.Format("{0:00}:{1:00}:{2:00}.{3:000}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds);
+            XLogger.Info($"END:{elapsed}\t Scheduled Task Execution");
         }
 
+        private static void SendReport(List<ReportEntry> prices)
+        {
+            //var html = Extensions.GetMyTable<ReportEntry>(prices, re=> re.idx, re=>re.PartCode);
+            var html = Utils.GetMyTable<ReportEntry>(prices,
+                r => r.idx, r => r.PartCode, r => r.HGMPrice, r => r.TruparPrice, r => r.Difference, r => r.DifferencePCT);
 
+            var contentsFile = "LastMail.html";
+            log.DebugFormat("Sending mail with contents: {0}", html);
+            contentsFile.DeleteFile();
+            File.WriteAllText(contentsFile, html);
+            //
+            int Port;
+            int.TryParse(SettingsConfigurationSection.AppSetting("SendMailPort"), out Port);
+            using (SmtpClient client = new SmtpClient(SettingsConfigurationSection.AppSetting("SendMailHost"), Port))
+            {
+                client.EnableSsl = SettingsConfigurationSection.AppSetting("SendMailEnableSsl").Equals("true", StringComparison.OrdinalIgnoreCase);
+                MailAddress from = new MailAddress(SettingsConfigurationSection.AppSetting("SendMailFrom"), SettingsConfigurationSection.AppSetting("SendMailFrom"));
+                string SendMailTo = SettingsConfigurationSection.AppSetting("SendMailTo");
+#if false
+                    MailAddress to = new MailAddress(SendMailTo, SendMailTo);
+                    using (MailMessage message = new MailMessage(from, to))
+                    {
+#else
+                using (MailMessage message = new MailMessage())
+                {
+                    message.From = from;
+                    foreach (var to in (SendMailTo ?? "").Replace(";", ",").Split(',').Select(x => x.Trim()).Where(x => (x.Length > 0) && (x.Contains('@'))))
+                        message.To.Add(to);
+
+#endif
+                    message.IsBodyHtml = true;
+                    message.Subject = SettingsConfigurationSection.AppSetting("SendMailSubject");
+                    message.Body = html;
+                    message.ReplyToList.Add(SettingsConfigurationSection.AppSetting("SendMailFrom"));
+                    NetworkCredential myCreds = new NetworkCredential(SettingsConfigurationSection.AppSetting("SendMailUser"), SettingsConfigurationSection.AppSetting("SendMailPwd"), SettingsConfigurationSection.AppSetting("SendMailDomain"));
+                    client.Credentials = myCreds;
+                    client.Send(message);
+                }
+            }
+
+        }
+
+        private static List<ReportEntry> ReadPrices()
+        {
+            var res = new List<ReportEntry>();
+            try
+            {
+                PartUrl.GetRefs(Path.Combine(Environment.CurrentDirectory, "PartsUrls.csv"));
+
+                ParallelOptions options = new ParallelOptions() { MaxDegreeOfParallelism = NThreads };
+                Parallel.ForEach(PartUrl.refs, options, (curretRef) =>
+                {
+                    string partCode;
+                    decimal hgmPrice, truparPrice;
+                    Engine.ParseHGM(curretRef.hgmURL, out hgmPrice);
+                    Engine.ParseTrupar(curretRef.TruparURL, out partCode, out truparPrice);
+                    var rep = new ReportEntry()
+                    {
+                        idx = curretRef.idx,
+                        PartCode = partCode,
+                        HGMPrice = hgmPrice,
+                        TruparPrice = truparPrice,
+                        Difference = Math.Round(truparPrice - hgmPrice, 2),
+                        DifferencePCT = Math.Round((truparPrice - hgmPrice) / hgmPrice * 100, 2)
+                    };
+
+                    res.Add(rep);
+                });
+
+                return res.OrderBy(r => r.idx).ToList();
+            }
+            catch (Exception x)
+            {
+                XLogger.Error(x);
+            }
+            return res;
+        }
+        private static void SendReport_OLD()
+        {
+            StringBuilder sb = new StringBuilder("<table border='1'><tr><th>HGMLiftParts Code</th><th>HGMLiftParts Price</th><th>Site</th><th>Code</th><th>Price</th><th>Difference</th><th>Difference (%)</th></tr>");
+            foreach (var article in Articles)
+            {
+                sb.AppendFormat("<tr><td>{0}</td><td align='right'>{1:N2}</td><td>{2}</td><td>{3}</td><td align='right'>{4}{5:N2}{6}</td><td align='right'>{7:+0.00;-0.00;0.00}</td><td align='right'>{8:+0.00;-0.00;0.00}</td></tr>", article.HGMLiftParts_Code, article.HGMLiftParts_Price == -1 ? null : article.HGMLiftParts_Price, article.Site, article.Code, article.Price != -1 && article.Price < article.HGMLiftParts_Price ? "<font color=red>" : "", article.Price == -1 ? null : article.Price, article.Price != -1 && article.Price < article.HGMLiftParts_Price ? "</font>" : "", article.Price == -1 || article.HGMLiftParts_Price == -1 ? null : article.Price - article.HGMLiftParts_Price, article.Price == -1 || article.HGMLiftParts_Price == -1 || article.HGMLiftParts_Price == 0 ? null : (article.Price - article.HGMLiftParts_Price) / article.HGMLiftParts_Price * 100.0);
+            }
+            sb.Append("</table>");
+            //File.AppendAllText("output.html", sb.ToString());
+
+            var contents = sb.ToString();
+            var contentsFile = "LastMail.html";
+            log.DebugFormat("Sending mail with contents: {0}", sb.ToString());
+            contentsFile.DeleteFile();
+            File.WriteAllText(contentsFile, contents);
+
+            int Port;
+            int.TryParse(SettingsConfigurationSection.AppSetting("SendMailPort"), out Port);
+            using (SmtpClient client = new SmtpClient(SettingsConfigurationSection.AppSetting("SendMailHost"), Port))
+            {
+                client.EnableSsl = SettingsConfigurationSection.AppSetting("SendMailEnableSsl").Equals("true", StringComparison.OrdinalIgnoreCase);
+                MailAddress from = new MailAddress(SettingsConfigurationSection.AppSetting("SendMailFrom"), SettingsConfigurationSection.AppSetting("SendMailFrom"));
+                string SendMailTo = SettingsConfigurationSection.AppSetting("SendMailTo");
+#if false
+                    MailAddress to = new MailAddress(SendMailTo, SendMailTo);
+                    using (MailMessage message = new MailMessage(from, to))
+                    {
+#else
+                using (MailMessage message = new MailMessage())
+                {
+                    message.From = from;
+                    foreach (var to in (SendMailTo ?? "").Replace(";", ",").Split(',').Select(x => x.Trim()).Where(x => (x.Length > 0) && (x.Contains('@'))))
+                        message.To.Add(to);
+
+#endif
+                    message.IsBodyHtml = true;
+                    message.Subject = SettingsConfigurationSection.AppSetting("SendMailSubject");
+                    message.Body = sb.ToString();
+                    message.ReplyToList.Add(SettingsConfigurationSection.AppSetting("SendMailFrom"));
+                    NetworkCredential myCreds = new NetworkCredential(SettingsConfigurationSection.AppSetting("SendMailUser"), SettingsConfigurationSection.AppSetting("SendMailPwd"), SettingsConfigurationSection.AppSetting("SendMailDomain"));
+                    client.Credentials = myCreds;
+                    client.Send(message);
+                }
+            }
+        }
+
+        static void ComputePrices_OLD()
+        {
+            System.Net.ServicePointManager.DefaultConnectionLimit = NThreads;
+            var settings = SettingsConfigurationSection.Settings("Settings");
+            sites = settings.Sites;
+
+            var articles = settings.Articles;
+            string HGMLiftParts_Code = "";
+
+            foreach (var article in articles.OrderBy(x => x.HGMLiftParts_Code).ThenBy(x => x.Site))
+            {
+                Articles.Add(article);
+                if (article.HGMLiftParts_Code != HGMLiftParts_Code)
+                    PricesToCalculate.Push(new Tuple<string, string, Articles>("HGMLiftParts", HGMLiftParts_Code = article.HGMLiftParts_Code, article));
+                PricesToCalculate.Push(new Tuple<string, string, Articles>(article.Site, article.Code, article));
+            }
+
+            while (PricesToCalculate.Count > 0)
+            {
+                stopWaitHandle = new AutoResetEvent(false);
+                for (int i = 0; (i < NThreads) && (PricesToCalculate.Count > 0); i++)
+                    if (threads[i] == null)
+                    {
+                        threads[i] = new Thread(HandleThread);
+                        var PriceToCalculate = PricesToCalculate.Pop();
+                        threads[i].Name = string.Format("site: {0}, code: {1}", PriceToCalculate.Item1, PriceToCalculate.Item2);
+                        threads[i].Start(new args(i, PriceToCalculate.Item1, PriceToCalculate.Item2, PriceToCalculate.Item3));
+                    }
+                stopWaitHandle.WaitOne();
+            }
+
+            for (int i = 0; i < NThreads; i++)
+                if (threads[i] != null)
+                    threads[i].Join();
+
+            HGMLiftParts_Code = "";
+            double? HGMLiftParts_Price = null;
+            foreach (var article in Articles)
+            {
+                if (article.HGMLiftParts_Code == HGMLiftParts_Code)
+                {
+                    article.HGMLiftParts_Price = HGMLiftParts_Price;
+                }
+                else
+                {
+                    HGMLiftParts_Price = article.HGMLiftParts_Price;
+                    HGMLiftParts_Code = article.HGMLiftParts_Code;
+                }
+            }
+
+        }
         static string LoadPage(string url)
         {
             string buf = "";
@@ -203,12 +305,9 @@ namespace CheckPrices
             var site = sites.Single(x => x.Site == Site);
 
             var url = string.Format(site.URL, Code);
-            if (url.StartsWith("https", StringComparison.InvariantCultureIgnoreCase))
-                s = HtmlAgility.GetWebConent(url);
-            else
-                s = LoadPage(url);
+            s = HtmlAgility.GetWebContent(url);
             s = s.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
-            var match = Regex.Match(s, site.Match).Groups[int.Parse(site.Group)].Value.Replace(",", "");
+            var match = Regex.Match(s, site.Match).Groups[int.Parse(site.Group)].Value.Replace(",", "").TrimStart('$');
 
             double price;
             if (!double.TryParse(match, out price))

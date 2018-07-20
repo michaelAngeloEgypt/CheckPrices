@@ -35,6 +35,13 @@
       <add Site="trupar" URL="http://www.trupar.com/{0}.htm"
           Match="\$\d+\.*\d*" Group="0"/>
     </Sites>
+
+    <Articles>
+      <add Site="trupar" HGMLiftParts_Code="CT0000-91011-P597540" Code="Caterpillar-Washer-p/ct0000-91011"/>
+      <add Site="trupar" HGMLiftParts_Code="YT017020900-P885431" Code="Yale-Master-Cylinder-p/yt017020900"/>
+      <add Site="trupar" HGMLiftParts_Code="CR113920-P596017" Code="Crown-Brake-Rotor-p/cr113920"/>
+      <add Site="trupar" HGMLiftParts_Code="TY53730-U2100-71-P878554" Code="Toyota-Vinyl-Seat-p/ty53730-u2100-71"/>
+    </Articles>
   </Settings>
 
   <appSettings>
