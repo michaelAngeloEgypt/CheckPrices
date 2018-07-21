@@ -10,7 +10,7 @@ namespace CheckPrices
 {
     class PartUrl
     {
-        public string idx { get; set; }
+        public int idx { get; set; }
         public string hgmURL { get; set; }
         public string TruparURL { get; set; }
 

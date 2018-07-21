@@ -80,10 +80,11 @@ namespace CheckPrices
         {
             //var html = Extensions.GetMyTable<ReportEntry>(prices, re=> re.idx, re=>re.PartCode);
             var html = Utils.GetMyTable<ReportEntry>(prices,
-                r => r.idx, r => r.PartCode, r => r.HGMPrice, r => r.TruparPrice, r => r.Difference, r => r.DifferencePCT);
+                r => r.idx, r => r.PartCode, r => r.HGMPriceStr, r => r.TruparPriceStr, r => r.DifferenceStr, r => r.DifferencePCTStr);
 
             var contentsFile = "LastMail.html";
-            log.DebugFormat("Sending mail with contents: {0}", html);
+            //log.DebugFormat("Sending mail with contents: {0}", html);
+            log.DebugFormat("Sending mail");
             contentsFile.DeleteFile();
             File.WriteAllText(contentsFile, html);
             //
@@ -123,19 +124,22 @@ namespace CheckPrices
             var res = new List<ReportEntry>();
             try
             {
-                PartUrl.GetRefs(Path.Combine(Environment.CurrentDirectory, "PartsUrls.csv"));
+                PartUrl.GetRefs(Path.Combine(Environment.CurrentDirectory, ConfigurationManager.AppSettings["InputFile"]));
 
+                //var currentRef = PartUrl.refs.FirstOrDefault(r => r.idx == 1);
                 ParallelOptions options = new ParallelOptions() { MaxDegreeOfParallelism = NThreads };
-                Parallel.ForEach(PartUrl.refs, options, (curretRef) =>
+                //foreach (var currentRef in PartUrl.refs)
+                Parallel.ForEach(PartUrl.refs, options, (currentRef) =>
                 {
-                    string partCode;
+                    string hgmPartCode, trupartPartCode;
                     decimal hgmPrice, truparPrice;
-                    Engine.ParseHGM(curretRef.hgmURL, out hgmPrice);
-                    Engine.ParseTrupar(curretRef.TruparURL, out partCode, out truparPrice);
+                    Engine.ParseHGM(currentRef.hgmURL, out hgmPartCode, out hgmPrice);
+                    Engine.ParseTrupar(currentRef.TruparURL, out trupartPartCode, out truparPrice);
                     var rep = new ReportEntry()
                     {
-                        idx = curretRef.idx,
-                        PartCode = partCode,
+                        idx = currentRef.idx,
+                        HGMPartCode = hgmPartCode,
+                        TruparPartCode = trupartPartCode,
                         HGMPrice = hgmPrice,
                         TruparPrice = truparPrice,
                         Difference = Math.Round(truparPrice - hgmPrice, 2),
@@ -143,7 +147,8 @@ namespace CheckPrices
                     };
 
                     res.Add(rep);
-                });
+                }
+                );
 
                 return res.OrderBy(r => r.idx).ToList();
             }

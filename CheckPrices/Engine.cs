@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,18 +10,20 @@ namespace CheckPrices
 {
     static class Engine
     {
-        public static void ParseHGM(string hgmUrl, out decimal hgmPrice)
+        public static void ParseHGM(string hgmUrl, out string hgmPartCode, out decimal hgmPrice)
         {
             hgmPrice = -1;
+            hgmPartCode = string.Empty;
             try
             {
                 if (!HtmlAgility.UrlIsValid(hgmUrl))
-                    throw new ArgumentException("invalid url", "url");
+                    throw new ArgumentException("invalid url", "hgmUrl");
 
                 HAP.HtmlDocument docSearch;
                 HtmlAgility.GetDocumentFromUrl(hgmUrl, out docSearch);
-                var strPrice = HtmlAgility.ScrapElement(docSearch, "//span[@itemprop = 'price']")?.Trim('$');
+                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["HGM.Price"])?.Trim('$');
                 decimal.TryParse(strPrice, out hgmPrice);
+                hgmPartCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["HGM.PartCode"]);
             }
             catch (Exception x)
             {
@@ -36,16 +39,24 @@ namespace CheckPrices
 
             try
             {
+                if (!HtmlAgility.UrlIsValid(truparURL))
+                    throw new ArgumentException("invalid url", "truparURL");
+
                 HAP.HtmlDocument docSearch;
                 HtmlAgility.GetDocumentFromUrl(truparURL, out docSearch);
-                var detailsUrl = HtmlAgility.GetUrlFromAnchor(docSearch, "//a[@class='link view - product'");
+                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["Trupar.Price"])?.Trim('$');
+                partCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["Trupar.PartCode"]);
 
+                /* - details
+                var detailsUrl = HtmlAgility.GetUrlFromAnchor(docSearch, ConfigurationManager.AppSettings["Trupar.Details"]);
                 HAP.HtmlDocument docDetails;
                 HtmlAgility.GetDocumentFromUrl(detailsUrl, out docDetails);
-                var strPrice = HtmlAgility.ScrapElement(docSearch, "//span[@itemprop = 'price']")?.Trim('$');
-                decimal.TryParse(strPrice, out truparPrice);
-                partCode = HtmlAgility.ScrapElement(docSearch, "//span[@itemprop = 'sku']");
+                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["Trupar.Price"])?.Trim('$');
+                partCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["Trupar.PartCode"]);
                 // IList<HAP.HtmlNode> nodes = doc.QuerySelectorAll("span .itemprop > ul li");
+                */
+
+                decimal.TryParse(strPrice, out truparPrice);
             }
             catch (Exception x)
             {

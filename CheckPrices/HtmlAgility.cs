@@ -109,6 +109,9 @@ public static class HtmlAgility
             //content = GetWebContentCore3(url);
             //content = GetWebContentCore4(url);
             content = GetWebContentCore5(url);
+            //content = GetWebContentCore6(url);
+            //content = GetWebContentCore7(url);
+            //content = GetWebContentCore8(url);
             consumedRetries--;
         }
         return content;
@@ -131,7 +134,7 @@ public static class HtmlAgility
     /// </summary>
     /// <param name="url"></param>
     /// <returns></returns>
-    private static string GetWebConentCore1(string url, bool useProxy = false)
+    private static string GetWebContentCore1(string url, bool useProxy = false)
     {
 
         System.IO.Stream st = null;
@@ -183,7 +186,7 @@ public static class HtmlAgility
                 st.Close();
         }
     }
-    private static string GetWebConentCore2(string url, bool useProxy = false)
+    private static string GetWebContentCore2(string url, bool useProxy = false)
     {
         try
         {
@@ -223,7 +226,7 @@ public static class HtmlAgility
             return string.Empty;
         }
     }
-    private static string GetWebConentCore3(string url)
+    private static string GetWebContentCore3(string url)
     {
         try
         {
@@ -240,7 +243,7 @@ public static class HtmlAgility
             return string.Empty;
         }
     }
-    public static string GetWebConentCore4(string url, bool useProxy = false)
+    public static string GetWebContentCore4(string url, bool useProxy = false)
     {
         String res = "";
         System.IO.Stream st = null;
@@ -302,7 +305,67 @@ public static class HtmlAgility
         catch (Exception x)
         {
             x.Data.Add("url", url);
-            XLogger.Error(x);
+            throw;
+        }
+    }
+    private static string GetWebContentCore6(string url)
+    {
+        string res = "";
+        try
+        {
+            var myClient = new MyClient();
+            Uri myUri = new Uri(url, UriKind.Absolute);
+            using (Stream data = myClient.OpenRead(myUri))
+            {
+                using (StreamReader reader = new StreamReader(data))
+                {
+                    string s = reader.ReadToEnd();
+                    data.Close();
+                    reader.Close();
+                }
+            }
+
+            //MyWebRequest myRequest = new MyWebRequest(url);
+            //res = myRequest.GetResponse();
+
+            return res;
+        }
+        catch (Exception x)
+        {
+            x.Data.Add("url", url);
+            throw;
+        }
+    }
+    private static string GetWebContentCore7(string url)
+    {
+        string res = "";
+        try
+        {
+            var homeRequest = WebRequest.CreateHttp(url);
+            res = homeRequest.GetResponse().Body();
+
+            return res;
+        }
+        catch (Exception x)
+        {
+            x.Data.Add("url", url);
+            throw;
+        }
+    }
+    private static string GetWebContentCore8(string url)
+    {
+        string res = "";
+        try
+        {
+            WebRequest request = WebRequest.Create("http://www.example.com/test.xml");
+            WebResponse response = request.GetResponse();
+            Stream dataStream = response.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream);
+            return reader.ReadToEnd();
+        }
+        catch (Exception x)
+        {
+            x.Data.Add("url", url);
             throw;
         }
     }
@@ -537,7 +600,7 @@ public static class HtmlAgility
         catch (Exception x)
         {
             x.Data.Add("elementXml", elementXml);
-            XLogger.Error(x);
+            throw;
         }
         return output;
     }
@@ -592,6 +655,19 @@ static class Ext
 
         return victim;
     }
+    /// <summary>
+    /// <see cref="https://stackoverflow.com/a/13280617/193974"/>
+    /// </summary>
+    /// <param name="response"></param>
+    /// <returns></returns>
+    internal static string Body(this WebResponse response)
+    {
+        var stream = response.GetResponseStream();
+        using (var reader = new StreamReader(stream, Encoding.GetEncoding("utf-8")))
+        {
+            return reader.ReadToEnd();
+        }
+    }
     #endregion Extensions
 
 }
@@ -613,4 +689,99 @@ class MyClient : WebClient
         req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
         return req;
     }
+}
+
+/// <summary>
+/// <see cref="http://codesamplez.com/programming/http-request-c-sharp"/>
+/// </summary>
+public class MyWebRequest
+{
+    private WebRequest request;
+    private Stream dataStream;
+
+    private string status;
+
+    public String Status
+    {
+        get
+        {
+            return status;
+        }
+        set
+        {
+            status = value;
+        }
+    }
+
+    public MyWebRequest(string url)
+    {
+        // Create a request using a URL that can receive a post.
+
+        request = WebRequest.Create(url);
+    }
+
+    public MyWebRequest(string url, string method)
+        : this(url)
+    {
+
+        if (method.Equals("GET") || method.Equals("POST"))
+        {
+            // Set the Method property of the request to POST.
+            request.Method = method;
+        }
+        else
+        {
+            throw new Exception("Invalid Method Type");
+        }
+    }
+
+    public MyWebRequest(string url, string method, string data)
+        : this(url, method)
+    {
+
+        // Create POST data and convert it to a byte array.
+        string postData = data;
+        byte[] byteArray = Encoding.UTF8.GetBytes(postData);
+
+        // Set the ContentType property of the WebRequest.
+        request.ContentType = "application/x-www-form-urlencoded";
+
+        // Set the ContentLength property of the WebRequest.
+        request.ContentLength = byteArray.Length;
+
+        // Get the request stream.
+        dataStream = request.GetRequestStream();
+
+        // Write the data to the request stream.
+        dataStream.Write(byteArray, 0, byteArray.Length);
+
+        // Close the Stream object.
+        dataStream.Close();
+
+    }
+
+    public string GetResponse()
+    {
+        // Get the original response.
+        WebResponse response = request.GetResponse();
+
+        this.Status = ((HttpWebResponse)response).StatusDescription;
+
+        // Get the stream containing all content returned by the requested server.
+        dataStream = response.GetResponseStream();
+
+        // Open the stream using a StreamReader for easy access.
+        StreamReader reader = new StreamReader(dataStream);
+
+        // Read the content fully up to the end.
+        string responseFromServer = reader.ReadToEnd();
+
+        // Clean up the streams.
+        reader.Close();
+        dataStream.Close();
+        response.Close();
+
+        return responseFromServer;
+    }
+
 }
