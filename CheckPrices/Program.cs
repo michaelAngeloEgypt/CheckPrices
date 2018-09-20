@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Windows.Forms;
 using System.Configuration;
-using System.Net;
-using System.IO;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.Mail;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 //Here is the once-per-application setup information
@@ -80,7 +79,10 @@ namespace CheckPrices
         {
             //var html = Extensions.GetMyTable<ReportEntry>(prices, re=> re.idx, re=>re.PartCode);
             var html = Utils.GetMyTable<ReportEntry>(prices,
-                r => r.idx, r => r.PartCode, r => r.HGMPriceStr, r => r.TruparPriceStr, r => r.DifferenceStr, r => r.DifferencePCTStr);
+                r => r.idx, r => r.PartCode, r => r.HGMPriceStr,
+                r => r.TruparPriceStr, r => r.DifferenceTruparStr, r => r.DifferenceTruparPCTStr,
+                r=> r.LiftPartsPartCode, r => r.LiftPartsPriceStr, r => r.DifferenceLiftPartsStr, r => r.DifferenceLiftPartsPCTStr
+            );
 
             var contentsFile = "LastMail.html";
             //log.DebugFormat("Sending mail with contents: {0}", html);
@@ -113,7 +115,7 @@ namespace CheckPrices
                     message.ReplyToList.Add(SettingsConfigurationSection.AppSetting("SendMailFrom"));
                     NetworkCredential myCreds = new NetworkCredential(SettingsConfigurationSection.AppSetting("SendMailUser"), SettingsConfigurationSection.AppSetting("SendMailPwd"), SettingsConfigurationSection.AppSetting("SendMailDomain"));
                     client.Credentials = myCreds;
-                    client.Send(message);
+                    //client.Send(message);
                 }
             }
 
@@ -131,19 +133,24 @@ namespace CheckPrices
                 //foreach (var currentRef in PartUrl.refs)
                 Parallel.ForEach(PartUrl.refs, options, (currentRef) =>
                 {
-                    string hgmPartCode, trupartPartCode;
-                    decimal hgmPrice, truparPrice;
+                    string hgmPartCode, trupartPartCode, liftPartsCode;
+                    decimal hgmPrice, truparPrice, liftPartsPrice;
                     Engine.ParseHGM(currentRef.hgmURL, out hgmPartCode, out hgmPrice);
                     Engine.ParseTrupar(currentRef.TruparURL, out trupartPartCode, out truparPrice);
+                    Engine.ParseLiftParts(currentRef.liftPartsURL, out liftPartsCode, out liftPartsPrice);
                     var rep = new ReportEntry()
                     {
                         idx = currentRef.idx,
                         HGMPartCode = hgmPartCode,
                         TruparPartCode = trupartPartCode,
+                        LiftPartsPartCode = liftPartsCode,
                         HGMPrice = hgmPrice,
                         TruparPrice = truparPrice,
-                        Difference = Math.Round(truparPrice - hgmPrice, 2),
-                        DifferencePCT = Math.Round((truparPrice - hgmPrice) / hgmPrice * 100, 2)
+                        LiftPartsPrice = liftPartsPrice,
+                        DifferenceTrupar = Math.Round(truparPrice - hgmPrice, 2),
+                        DifferenceTruparPCT = Math.Round((truparPrice - hgmPrice) / hgmPrice * 100, 2),
+                        DifferenceLiftParts = Math.Round(liftPartsPrice - hgmPrice, 2),
+                        DifferenceLiftPartsPCT = Math.Round((liftPartsPrice - hgmPrice) / hgmPrice * 100, 2)
                     };
 
                     res.Add(rep);

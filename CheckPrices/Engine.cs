@@ -64,5 +64,28 @@ namespace CheckPrices
                 XLogger.Error(x);
             }
         }
+
+        public static void ParseLiftParts(string liftPartsUrl, out string liftPartsPartCode, out decimal liftPartsPrice)
+        {
+            liftPartsPrice = -1;
+            liftPartsPartCode = string.Empty;
+            try
+            {
+                if (!HtmlAgility.UrlIsValid(liftPartsUrl))
+                    throw new ArgumentException("invalid url", "liftPartsUrl");
+
+                HAP.HtmlDocument docSearch;
+                HtmlAgility.GetDocumentFromUrl(liftPartsUrl, out docSearch);
+                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.Price"])?.Trim('$').Trim();
+                decimal.TryParse(strPrice, out liftPartsPrice);
+                liftPartsPartCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.PartCode"]);
+            }
+            catch (Exception x)
+            {
+                x.Data.Add("liftPartsUrl", liftPartsUrl);
+                XLogger.Error(x);
+            }
+        }
+
     }
 }

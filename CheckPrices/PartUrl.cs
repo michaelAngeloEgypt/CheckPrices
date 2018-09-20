@@ -13,6 +13,7 @@ namespace CheckPrices
         public int idx { get; set; }
         public string hgmURL { get; set; }
         public string TruparURL { get; set; }
+        public string liftPartsURL { get; set; }
 
         public static List<PartUrl> refs { get; private set; }
         public static void GetRefs(string refPath)
