@@ -81,7 +81,7 @@ namespace CheckPrices
             var html = Utils.GetMyTable<ReportEntry>(prices,
                 r => r.idx, r => r.PartCode, r => r.HGMPriceStr,
                 r => r.TruparPriceStr, r => r.DifferenceTruparStr, r => r.DifferenceTruparPCTStr,
-                r=> r.LiftPartsPartCode, r => r.LiftPartsPriceStr, r => r.DifferenceLiftPartsStr, r => r.DifferenceLiftPartsPCTStr
+                r => r.LiftPartsPartCode, r => r.LiftPartsPriceStr, r => r.DifferenceLiftPartsStr, r => r.DifferenceLiftPartsPCTStr
             );
 
             var contentsFile = "LastMail.html";

@@ -76,9 +76,15 @@ namespace CheckPrices
 
                 HAP.HtmlDocument docSearch;
                 HtmlAgility.GetDocumentFromUrl(liftPartsUrl, out docSearch);
-                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.Price"])?.Trim('$').Trim();
+                var strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.Price1"])?.Trim('$').Trim();
                 decimal.TryParse(strPrice, out liftPartsPrice);
-                liftPartsPartCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.PartCode"]);
+                if (liftPartsPrice == 0)
+                    strPrice = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.Price2"])?.Trim('$').Trim();
+                decimal.TryParse(strPrice, out liftPartsPrice);
+
+                liftPartsPartCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.PartCode1"]);
+                if (string.IsNullOrWhiteSpace(liftPartsPartCode))
+                    liftPartsPartCode = HtmlAgility.ScrapElement(docSearch, ConfigurationManager.AppSettings["LiftParts.PartCode2"]);
             }
             catch (Exception x)
             {

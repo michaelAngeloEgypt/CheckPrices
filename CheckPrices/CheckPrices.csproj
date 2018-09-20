@@ -84,7 +84,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReportEntry.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="Tests.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="XLogger.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
